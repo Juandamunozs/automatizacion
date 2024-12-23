@@ -73,12 +73,39 @@ def buscar_partido_forebet(equipo, driver):
             )
             ganador = ganador_element.text
 
-            dict_partido = {"Ganador": ganador}
-            return dict_partido
+        except Exception as e:
+            print(f"Error al extraer información del ganador: {e}")
+            return None
+        
+        #probabilidad de ganar - local empate visitante
+        try:
+            local_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '/html/body/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/table/tbody/tr/td[2]/div[1]/div[7]/div/div[3]/span[1]'))
+            )
+            local  = local_element.text
+
+            empate_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '/html/body/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/table/tbody/tr/td[2]/div[1]/div[7]/div/div[3]/span[2]'))
+            )
+            empate  = empate_element.text
+
+            visitante_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '/html/body/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/table/tbody/tr/td[2]/div[1]/div[7]/div/div[3]/span[3]'))
+            )
+            visitante  = visitante_element.text
 
         except Exception as e:
             print(f"Error al extraer información del ganador: {e}")
             return None
+        
+        dict_partido = {
+            "Ganador_predicho": ganador,
+            "Local_porcentaje": local,
+            "Empate_porcentaje": empate,
+            "Visitante_porcentaje": visitante
+        }
+        
+        return dict_partido
 
     except Exception as e:
         print(f"Ocurrió un error general: {e}")

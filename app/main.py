@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Dict
 from service.analisis import investigar_partido
+import time
 
 # Crear la aplicación FastAPI
 app = FastAPI()
@@ -38,6 +39,9 @@ def buscar_partido(data: TeamRequest) -> Dict[str, str]:
         "match_info": "Detalles del partido encontrado"
     }
     """
+
+    inicia_analisis = time.time()
+
     team_name = data.team_name
 
     try:
@@ -45,10 +49,15 @@ def buscar_partido(data: TeamRequest) -> Dict[str, str]:
         match_info = investigar_partido(team_name)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"No se encontró información para el equipo {team_name}: {str(e)}")
+    
+    finaliza_analisis = time.time()
+
+    tiempo_analisis = finaliza_analisis - inicia_analisis
 
     return {
         "team_name": team_name,
-        "match_info": match_info  # Retornar la información del partido o la predicción
+        "match_info": match_info,
+        "tiempo_analisis": f"{tiempo_analisis:.2f} s"
     }
 
 """

@@ -52,18 +52,52 @@ def buscar_partido_wplay(equipo, driver):
             visitor_price_xpath = '//*[@id="main-area"]/div[4]/div[3]/div[1]/div/table/tbody/tr/td[3]/div/button/span/span[4]'
             visitor_price = driver.find_element(By.XPATH, visitor_price_xpath).text
 
-            #Devolver las cuotas
-            dict_cuotas = {
-                "cuota_local": local_price,
-                "cuota_empate": draw_price,
-                "cuota_visitante": visitor_price
-            }
-
-            return dict_cuotas
-
         except Exception as e:
             print(f"Error al obtener las cuotas: {e}")
             return None
+        
+        # tendencias del equipo opcion
+        try:
+            btn_buscar = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[1]/div[2]/div[3]/button'))
+            )
+            btn_buscar.click()
+            time.sleep(2)
+            btn_buscar.click()
+        except Exception as e:
+            print(f"Error al seleccionar el los click de tendencias: {e}")
+            return None   
+
+        time.sleep(4) 
+        
+        # tomar porcentajes de tendencias
+        try:
+            # Ejemplo de XPath para Local 
+            local_tendencia_xpath ='//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[2]/div[3]/div/div/div[2]/div[1]/div[1]/div/div[1]'
+            local_tendencia = driver.find_element(By.XPATH, local_tendencia_xpath).text
+
+            # Ejemplo de XPath para visitante
+            visitante_tendencia_xpath = '//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[2]/div[3]/div/div/div[2]/div[1]/div[2]/div/div[1]'
+            visitante_tendencia = driver.find_element(By.XPATH, visitante_tendencia_xpath).text
+
+            print(f"las tendencias son: {local_tendencia} - {visitante_tendencia}")
+
+        except Exception as e:
+            print(f"Error al obtener las tendencias: {e}")
+            return None
+
+        
+        #Devolver las cuotas
+        dict_cuotas = {
+            "cuota_local": local_price,
+            "cuota_empate": draw_price,
+            "cuota_visitante": visitor_price,
+            "tendencia_local": local_tendencia,
+            "tendencia_visitante": visitante_tendencia
+        }
+
+
+        return dict_cuotas
 
     except Exception as e:
         print(f"Error al cargar la pagina: {e}")
