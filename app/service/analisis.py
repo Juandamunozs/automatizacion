@@ -1,21 +1,18 @@
 import json
 import os
-from env.env import dir_res 
+from env.env import dir_res
 from service.bet import buscar_partido_bet
+from service.log import logging_api
 from service.forebet import buscar_partido_forebet
 from service.flashscore import buscar_partido_flashcore
 from service.wplay import buscar_partido_wplay
+from service.besoccer import buscar_partido_besoccer
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 
-# Verificar si la carpeta 'res' existe; si no, crearla
-if not os.path.exists(dir_res):
-    os.makedirs(dir_res)
-
-# Función para investigar un partido
-def investigar_partido(equipo):
-
+# Función para inicializar el controlador de Chrome
+def inicializar_driver():
     # Configuración del controlador de Chrome
     chrome_options = Options()
 
@@ -31,30 +28,59 @@ def investigar_partido(equipo):
     # Maximizar la ventana del navegador
     driver.maximize_window()
 
+    return driver
+
+# Función para investigar un partido
+def investigar_partido(equipo):
+
+    logging_api.info(f"Investigando estadisticas del proximo partido de {equipo}")
+
+    driver = inicializar_driver()
+
     res_flashscore = None
     res_bet = None
     res_forebet = None
     res_wplay = None
+    res_besoccer = None
 
     try:
+        logging_api.info(f"***** Investigando en flashcore *****")
         res_flashscore = buscar_partido_flashcore(equipo, driver)
-    except Exception as e:
-        print(f"Error en buscar_partido_flashcore: {e}")
 
+        if res_flashscore['estado'] == False:
+            logging_api.info(f"No es posible predecir el estado del partido ya que ha finalizado o está en curso.")
+            driver.quit()
+            return f"No es posible predecir el estado del partido, ya sea porque ya se jugó o está en vivo."
+
+    except Exception as e:
+        logging_api.error(f"Error en buscar_partido_flashscore: {e}")
+        driver.quit()
+        return f"No hay datos disponibles para el próximo partido de {equipo}."
+
+    #todo: este esta en construccion
     # try:
+    #     logging_api.info(f"Investigando partido: {equipo} en Bet")
     #     res_bet = buscar_partido_bet(equipo, driver)
     # except Exception as e:
-    #     print(f"Error en buscar_partido_bet: {e}")
+    #     logging_api.error(f"Error en buscar_partido_bet: {e}")
 
     try:
+        logging_api.info(f"***** Investigando en Forebet *****")
         res_forebet = buscar_partido_forebet(equipo, driver)
     except Exception as e:
-        print(f"Error en buscar_partido_forebet: {e}")
+        logging_api.error(f"Error en buscar_partido_forebet: {e}")
 
     try:
+        logging_api.info(f"***** Investigando en Wplay *****")
         res_wplay = buscar_partido_wplay(equipo, driver)
     except Exception as e:
-        print(f"Error en buscar_partido_wplay: {e}")
+        logging_api.error(f"Error en buscar_partido_wplay: {e}")
+
+    try:
+        logging_api.info(f"***** Investigando en Besoccer *****")
+        res_besoccer = buscar_partido_besoccer(equipo, driver)
+    except Exception as e:
+        logging_api.error(f"Error en buscar_partido_besoccer: {e}")
 
     # Cerrar el navegador
     driver.quit()
@@ -64,11 +90,13 @@ def investigar_partido(equipo):
         "estadisticas": {
             # "cuotas_1": res_bet,
             "cuotas": res_wplay,
-            "predicciones": res_forebet
+            "predicciones": res_forebet,
+            "tendencias": res_besoccer
+
         }
     }
 
-    # print(f"{dict_global}")
+    logging_api.info(f"Datos del partido: {dict_global}")
 
     return diagnostico(dict_global)
 
@@ -83,19 +111,20 @@ def diagnostico(dict_partido):
         cuota_empate_2 = float(dict_partido["estadisticas"]["cuotas"]["cuota_empate"])
         cuota_visitante_2 = float(dict_partido["estadisticas"]["cuotas"]["cuota_visitante"])
 
-        tendencia_local = int(dict_partido["estadisticas"]["cuotas"]["tendencia_local"])
-        tendencia_visitante = int(dict_partido["estadisticas"]["cuotas"]["tendencia_visitante"])
+        tendencia_local = float(dict_partido["estadisticas"]["cuotas"]["tendencia_local"])
+        tendencia_visitante = float(dict_partido["estadisticas"]["cuotas"]["tendencia_visitante"])
 
         Ganador_predicho = dict_partido["estadisticas"]["predicciones"]["Ganador_predicho"]
-        probabilidad_local = int(dict_partido["estadisticas"]["predicciones"]["Local_porcentaje"])
-        probabilidad_empate = int(dict_partido["estadisticas"]["predicciones"]["Empate_porcentaje"])
-        probabilidad_visitante = int(dict_partido["estadisticas"]["predicciones"]["Visitante_porcentaje"])
+
+        probabilidad_local = (float(dict_partido["estadisticas"]["predicciones"]["Local_porcentaje"]) + float(dict_partido["estadisticas"]["tendencias"]["Local_porcentaje"])) / 2
+        probabilidad_empate = (float(dict_partido["estadisticas"]["predicciones"]["Empate_porcentaje"]) + float(dict_partido["estadisticas"]["tendencias"]["Empate_porcentaje"])) / 2
+        probabilidad_visitante = (float(dict_partido["estadisticas"]["predicciones"]["Visitante_porcentaje"]) + float(dict_partido["estadisticas"]["tendencias"]["Visitante_porcentaje"])) / 2
 
         # Sistema ponderado basado en cuotas, tendencias, probabilidades y ganador predicho
-        peso_cuotas = 0.3  # Cuotas tienen un peso de 30%
-        peso_tendencias = 0.3  # Tendencias tienen un peso de 30%
-        peso_probabilidades = 0.3  # Probabilidades tienen un peso de 30%
-        peso_ganador_predicho = 0.1  # Ganador predicho tiene un peso de 10%
+        peso_cuotas = 0.3  
+        peso_tendencias = 0.3  
+        peso_probabilidades = 0.3  
+        peso_ganador_predicho = 0.1  
 
         # Normalizamos las cuotas para que las menores sean mejores
         puntaje_local = (
@@ -138,18 +167,20 @@ def diagnostico(dict_partido):
 
         # Actualizamos el diccionario con la predicción
         dict_partido["prediccion"] = prediccion
+        logging_api.info(f"Predicción: {prediccion}")
 
         # Guardamos el resultado del partido en un archivo JSON
         try:
             archivo_json = os.path.join(dir_res, f"{equipo_local}-{equipo_visitante}.json")
             with open(archivo_json, "w") as archivo:
                 json.dump(dict_partido, archivo)
-            print(f"Archivo guardado: {archivo_json}")
+            logging_api.info(f"Archivo JSON guardado: {archivo_json}")
         except Exception as e:
-            print(f"Error al guardar el archivo JSON: {e}")
+            logging_api.error(f"Error al guardar archivo JSON: {e}")
 
         return prediccion
 
     except Exception as e:
+        logging_api.error(f"Error en diagnostico: {e}")
         return f"Error en diagnostico: {e}"
     

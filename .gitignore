@@ -1,3 +1,6 @@
 **/__pycache__/
 **/venv/
-
+res/*
+logs/*
+app/res*
+app/logs*

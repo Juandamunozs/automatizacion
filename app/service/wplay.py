@@ -2,9 +2,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
+from service.log import logging_api 
 
+# def buscar_partido_wplay(equipo, driver):
 def buscar_partido_wplay(equipo, driver):
     try:
+        logging_api.info("Iniciando búsqueda de partido en Forebet.")
         driver.get("https://apuestas.wplay.co/es")
 
         # Ingresar el nombre del equipo
@@ -14,7 +17,7 @@ def buscar_partido_wplay(equipo, driver):
             )
             input_equipo.send_keys(equipo)
         except Exception as e:
-            print(f"Error al ingresar el nombre del equipo: {e}")
+            logging_api.error(f"Error al ingresar el nombre del equipo: {e}")  
             return None
         
         # Seleccionar el equipo para buscar
@@ -24,17 +27,73 @@ def buscar_partido_wplay(equipo, driver):
             )
             btn_buscar.click()
         except Exception as e:
-            print(f"Error al seleccionar el equipo: {e}")
+            logging_api.error(f"Error al seleccionar el equipo: {e}")  
             return None
         
         # Click al partido
         try:
-            btn_buscar = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="main-area"]/div/div[2]/div[1]/div/div/div[2]/a'))
+            # Esperar a que el contenedor con la clase 'date-group' esté presente
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'date-group'))  # Sin el punto
             )
-            btn_buscar.click()
+
+            # Esperar a que el enlace dentro de ese contenedor esté presente y sea clickeable
+            WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CLASS_NAME, 'date-group'))  # Sin el punto
+            )
+
+            # Ejecutar el script para hacer clic en el enlace
+            script = """ 
+                    const partidoElements = document.querySelectorAll('.date-group');
+
+                    if (partidoElements) {
+                        count = 0;
+                        partidoElements.forEach((element) => {
+                            const evDetailElement = element.querySelector('.ev-detail.icon-FOOT');
+                            
+                            // Verificar si el texto de la clase 'ev-detail icon-FOOT' es 'Fútbol' y no contiene 'Fútbol Mujeres'
+                            if (evDetailElement && evDetailElement.textContent.includes('Fútbol') && !evDetailElement.textContent.includes('Fútbol Mujeres')) {
+                                count++;
+                                // Buscar el primer enlace que contiene "Especiales"
+                                const enlaceEspeciales = element.querySelector('a[href*="Especiales"]');
+                                
+                                if (enlaceEspeciales) {
+                                    // Si se encuentra, buscar el siguiente enlace
+                                    const siguienteEnlace = element.querySelector('a[href]:not([href*="Especiales"])');
+                                    
+                                    if (siguienteEnlace) {
+                                        if(count < 2){
+                                            console.log("Siguiente enlace encontrado:", siguienteEnlace.href);
+                                            siguienteEnlace.click();
+                                            return;
+                                        }
+
+                                    } else {
+                                        throw new Error("No se encontró el siguiente enlace.");
+                                    }
+                                } else {
+                                    // Si no se encuentra "Especiales", buscar cualquier enlace dentro del elemento
+                                    const enlace = element.querySelector('a');
+                                    if (enlace) {
+                                        if(count < 2){
+                                            console.log("Enlace encontrado:", enlace.href); 
+                                            enlace.click(); // Hace clic en el primer enlace disponible
+                                            return; // Detiene el ciclo una vez que se hace clic
+                                        }
+                                    } else {
+                                        throw new Error("Enlace no encontrado dentro del contenedor.");
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        throw new Error("Elemento con clase '.date-group' no encontrado.");
+                    }
+            """
+            driver.execute_script(script)
         except Exception as e:
-            print(f"Error al seleccionar el equipo: {e}")
+            # Manejo de error
+            print(f"Error al seleccionar el partido: {e}")
             return None
 
         time.sleep(2)
@@ -53,41 +112,51 @@ def buscar_partido_wplay(equipo, driver):
             visitor_price = driver.find_element(By.XPATH, visitor_price_xpath).text
 
         except Exception as e:
-            print(f"Error al obtener las cuotas: {e}")
+            logging_api.error(f"Error al obtener las cuotas: {e}")  
             return None
         
-        # tendencias del equipo opcion
-        try:
-            btn_buscar = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[1]/div[2]/div[3]/button'))
-            )
-            btn_buscar.click()
-            time.sleep(2)
-            btn_buscar.click()
-        except Exception as e:
-            print(f"Error al seleccionar el los click de tendencias: {e}")
-            return None   
+        intentos = 0
+        max_intentos = 4
 
-        time.sleep(4) 
-        
-        # tomar porcentajes de tendencias
-        try:
-            # Ejemplo de XPath para Local 
-            local_tendencia_xpath ='//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[2]/div[3]/div/div/div[2]/div[1]/div[1]/div/div[1]'
-            local_tendencia = driver.find_element(By.XPATH, local_tendencia_xpath).text
+        while intentos < max_intentos:
+            try:
+                # Intentar hacer clic en el botón "Tendencias"
+                btn_buscar = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, '//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[1]/div[2]/div[3]/button')
+                    )
+                )
+                btn_buscar.click()
+                time.sleep(2)  # Pausa para permitir que el contenido cargue
 
-            # Ejemplo de XPath para visitante
-            visitante_tendencia_xpath = '//*[@id="content1"]/div[2]/div/div/div/div/div/div[2]/div/div[2]/div[3]/div/div/div[2]/div[1]/div[2]/div/div[1]'
-            visitante_tendencia = driver.find_element(By.XPATH, visitante_tendencia_xpath).text
+                # Ejecutar el script JS para obtener las tendencias
+                tendencias_js = driver.execute_script("""
+                    const elementos = document.querySelectorAll('.sr-lmt-plus-0-meetingsandform__fc-value.srt-base-1-home-1, .sr-lmt-plus-0-meetingsandform__fc-value.srt-base-1-away-1');
+                    
+                    const tendencias = [];
+                    elementos.forEach((el) => {
+                        tendencias.push(el.textContent.trim());
+                    });
 
-            print(f"las tendencias son: {local_tendencia} - {visitante_tendencia}")
+                    return tendencias;
+                """)
 
-        except Exception as e:
-            print(f"Error al obtener las tendencias: {e}")
-            return None
+                if tendencias_js:
+                    local_tendencia = tendencias_js[0]
+                    visitante_tendencia = tendencias_js[1] if len(tendencias_js) > 1 else None
+                    break 
 
-        
-        #Devolver las cuotas
+                else:
+                    logging_api.info("No se encontraron tendencias en este intento.")
+                    intentos += 1
+                    continue 
+
+            except Exception as e:
+                logging_api.error(f"Error al intentar hacer clic en el botón de tendencias: {e}")
+                intentos += 1
+                continue  #
+       
+        # Devolver las cuotas
         dict_cuotas = {
             "cuota_local": local_price,
             "cuota_empate": draw_price,
@@ -96,9 +165,11 @@ def buscar_partido_wplay(equipo, driver):
             "tendencia_visitante": visitante_tendencia
         }
 
+        logging_api.info(f"wplay {dict_cuotas}")  
 
         return dict_cuotas
 
     except Exception as e:
-        print(f"Error al cargar la pagina: {e}")
+        logging_api.error(f"Error al cargar la página: {e}")  
         return None
+    

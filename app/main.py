@@ -13,32 +13,6 @@ class TeamRequest(BaseModel):
 
 @app.post("/buscar-partido", summary="Buscar partido en Flashscore", tags=["Partidos"])
 def buscar_partido(data: TeamRequest) -> Dict[str, str]:
-    """
-    Endpoint que recibe el nombre de un equipo de fútbol y utiliza la función buscar_partido_flashcore para obtener información del partido.
-
-    **Parámetros:**
-    - `team_name` (str): Nombre del equipo de fútbol.
-
-    **Respuesta:**
-    - Devuelve un diccionario con la información del partido encontrado.
-
-    **Errores:**
-    - Si no se encuentra información del partido, devuelve un error 404.
-
-    **Ejemplo de uso:**
-    ```json
-    {
-        "team_name": "atletico nacional"
-    }
-    ```
-
-    Respuesta esperada:
-    ```json
-    {
-        "team_name": "atletico nacional",
-        "match_info": "Detalles del partido encontrado"
-    }
-    """
 
     inicia_analisis = time.time()
 
@@ -53,11 +27,14 @@ def buscar_partido(data: TeamRequest) -> Dict[str, str]:
     finaliza_analisis = time.time()
 
     tiempo_analisis = finaliza_analisis - inicia_analisis
+    minutos = int(tiempo_analisis // 60)
+    segundos = int(tiempo_analisis % 60)
+    # milisegundos = round((tiempo_analisis % 1) * 1000)
 
     return {
         "team_name": team_name,
         "match_info": match_info,
-        "tiempo_analisis": f"{tiempo_analisis:.2f} s"
+        "tiempo_analisis": f"{minutos} minutos, {segundos} segundos"
     }
 
 """
@@ -66,4 +43,29 @@ Para ejecutar la aplicación, puedes utilizar el siguiente comando:
 
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+"""
+
+"""
+# from selenium import webdriver
+# from selenium.webdriver.chrome.service import Service
+# from selenium.webdriver.chrome.options import Options
+    
+# # Configuración del controlador de Chrome
+# chrome_options = Options()
+
+# # Ruta al ChromeDriver
+# driver_path = "C:\\selenium\\chromedriver.exe"
+
+#     # Configurar el servicio de ChromeDriver
+# service = Service(driver_path)
+
+# # Crear instancia del navegador
+# driver = webdriver.Chrome(service=service, options=chrome_options)
+
+# # Maximizar la ventana del navegador
+# driver.maximize_window()
+
+# equipo = "liverpool"
+    
+# buscar_partido_wplay(equipo, driver)
 """
